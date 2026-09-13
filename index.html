@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Relaxing Brahms</title>
+<style>
+  :root {
+    --bg: #1a1410;
+    --panel: #2a1f17;
+    --panel2: #3a2c20;
+    --wood: #8b5a2b;
+    --wood-light: #c89060;
+    --cream: #f4e8d0;
+    --muted: #a89078;
+    --accent: #e8b070;
+    --danger: #c05040;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Georgia, 'Times New Roman', serif;
+    background: radial-gradient(ellipse at top, #2a1f17 0%, #1a1410 70%);
+    color: var(--cream);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  h1 {
+    text-align: center;
+    font-size: 2.4em;
+    margin: 0 0 6px;
+    color: var(--accent);
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    letter-spacing: 2px;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 28px;
+  }
+  .container {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 18px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .drop {
+    border: 2px dashed var(--wood);
+    border-radius: 10px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(139,90,43,0.05);
+  }
+  .drop:hover, .drop.drag {
+    background: rgba(139,90,43,0.15);
+    border-color: var(--accent);
+  }
+  .drop p { margin: 4px 0; }
+  .drop small { color: var(--muted); }
+  input[type="file"] { display: none; }
+  .track {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    background: var(--panel2);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .track .name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .track input[type="range"] { width: 90px; }
+  .track label { font-size: 0.85em; color: var(--muted); }
+  button {
+    background: linear-gradient(180deg, var(--wood-light), var(--wood));
+    color: #fff;
+    border: none;
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 1em;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    transition: transform 0.1s;
+  }
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+  button.danger {
+    background: linear-gradient(180deg, #d06050, #903020);
+    padding: 6px 12px;
+    font-size: 0.85em;
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .controls .spacer { flex: 1; }
+  .master {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .master input { width: 140px; }
+  .status {
+    text-align: center;
+    color: var(--muted);
+    font-style: italic;
+    min-height: 1.4em;
+  }
+  .playing-indicator {
+    display: inline-block;
+    width: 8px; height: 8px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    padding: 20px;
+    font-style: italic;
+  }
+  .octave-select {
+    background: var(--panel2);
+    color: var(--cream);
+    border: 1px solid var(--wood);
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-family: inherit;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎸 Relaxing Brahms</h1>
+  <div class="subtitle">A quiet evening with four or five guitars</div>
+
+  <div class="panel">
+    <div class="drop" id="drop">
+      <p><strong>Drop MIDI files here</strong></p>
+      <p><small>or click to choose (4–5 tracks recommended)</small></p>
+      <input type="file" id="fileInput" accept=".mid,.midi" multiple />
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3 style="margin-top:0;color:var(--accent)">Tracks</h3>
+    <div id="trackList"></div>
+    <div id="emptyMsg" class="empty">No tracks loaded yet.</div>
+  </div>
+
+  <div class="panel">
+    <div class="controls">
+      <button id="playBtn" disabled>▶ Play</button>
+      <button id="stopBtn" disabled>■ Stop</button>
+      <select id="octaveShift" class="octave-select" title="Pitch shift">
+        <option value="-2">−2 octaves</option>
+        <option value="-1">−1 octave</option>
+        <option value="0" selected>Concert pitch</option>
+        <option value="1">+1 octave</option>
+      </select>
+      <div class="spacer"></div>
+      <div class="master">
+        <label>Master</label>
+        <input type="range" id="masterVol" min="0" max="1" step="0.01" value="0.7" />
+      </div>
+    </div>
+    <div class="status" id="status" style="margin-top:14px">Ready.</div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   RELAXING BRAHMS — single-file MIDI guitar player
+   ============================================================ */
+
+/* ---------- IndexedDB storage ---------- */
+const DB_NAME = 'relaxing-brahms';
+const STORE = 'tracks';
+let db;
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE)) {
+        d.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    req.onsuccess = e => { db = e.target.result; res(); };
+    req.onerror = e => rej(e);
+  });
+}
+function dbAll() {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).getAll();
+    req.onsuccess = () => res(req.result);
+    req.onerror = e => rej(e);
+  });
+}
+function dbAdd(obj) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).add(obj);
+    req.onsuccess = () => res(req.result);
+    req.onerror = e => rej(e);
+  });
+}
+function dbPut(obj) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).put(obj);
+    req.onsuccess = () => res();
+    req.onerror = e => rej(e);
+  });
+}
+function dbDel(id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const req = tx.objectStore(STORE).delete(id);
+    req.onsuccess = () => res();
+    req.onerror = e => rej(e);
+  });
+}
+
+/* ---------- MIDI parser ----------
+   Returns { ppq, tracks: [ [{tick, type, data}], ... ] }
+   We convert everything to absolute ticks and keep only what we need:
+   note on/off and tempo meta events.
+-------------------------------------- */
+function parseMidi(buffer) {
+  const data = new Uint8Array(buffer);
+  let p = 0;
+  const read = n => { const s = data.subarray(p, p+n); p += n; return s; };
+  const u16 = () => { const v = (data[p]<<8)|data[p+1]; p+=2; return v; };
+  const u32 = () => { const v = ((data[p]<<24)|(data[p+1]<<16)|(data[p+2]<<8)|data[p+3])>>>0; p+=4; return v; };
+  const vlq = () => {
+    let v = 0, b;
+    do { b = data[p++]; v = (v << 7) | (b & 0x7f); } while (b & 0x80);
+    return v;
+  };
+  const str = n => { let s=''; for (let i=0;i<n;i++) s+=String.fromCharCode(data[p+i]); p+=n; return s; };
+
+  // Header
+  if (str(4) !== 'MThd') throw new Error('Not a MIDI file');
+  const hlen = u32();
+  const format = u16();
+  const ntrks = u16();
+  const ppq = u16();
+  p = 8 + hlen; // safety
+
+  const tracks = [];
+  for (let t = 0; t < ntrks; t++) {
+    if (str(4) !== 'MTrk') throw new Error('Bad track chunk');
+    const tlen = u32();
+    const end = p + tlen;
+    const events = [];
+    let tick = 0;
+    let runningStatus = 0;
+    while (p < end) {
+      tick += vlq();
+      let status = data[p];
+      if (status & 0x80) { p++; runningStatus = status; }
+      else status = runningStatus;
+
+      const type = status & 0xf0;
+      const ch = status & 0x0f;
+
+      if (status === 0xff) { // meta
+        const mtype = data[p++];
+        const mlen = vlq();
+        const mdata = data.subarray(p, p+mlen); p += mlen;
+        if (mtype === 0x51 && mlen === 3) { // tempo
+          const usPerQ = (mdata[0]<<16)|(mdata[1]<<8)|mdata[2];
+          events.push({ tick, type: 'tempo', usPerQ });
+        } else if (mtype === 0x03 || mtype === 0x01) {
+          // track name / text — keep as name hint
+          try { events.push({ tick, type: 'name', text: new TextDecoder().decode(mdata) }); } catch(e){}
+        }
+      } else if (status === 0xf0 || status === 0xf7) { // sysex
+        const slen = vlq(); p += slen;
+      } else if (type === 0x90) {
+        const note = data[p++], vel = data[p++];
+        events.push({ tick, type: vel === 0 ? 'off' : 'on', ch, note, vel });
+      } else if (type === 0x80) {
+        const note = data[p++], vel = data[p++];
+        events.push({ tick, type: 'off', ch, note, vel });
+      } else if (type === 0xa0 || type === 0xb0 || type === 0xe0) {
+        p += 2;
+      } else if (type === 0xc0 || type === 0xd0) {
+        p += 1;
+      }
+    }
+    p = end;
+    tracks.push(events);
+  }
+  return { format, ppq, tracks };
+}
+
+/* ---------- Karplus-Strong guitar synth ---------- */
+class GuitarSynth {
+  constructor(ctx) {
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = 0.7;
+
+    // Simple reverb via convolver with generated impulse
+    this.reverb = ctx.createConvolver();
+    this.reverb.buffer = this._makeImpulse(2.2, 2.5);
+    const wet = ctx.createGain(); wet.gain.value = 0.25;
+    const dry = ctx.createGain(); dry.gain.value = 0.9;
+    this.master.connect(dry).connect(ctx.destination);
+    this.master.connect(this.reverb).connect(wet).connect(ctx.destination);
+  }
+  setVolume(v) { this.master.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02); }
+  _makeImpulse(duration, decay) {
+    const rate = this.ctx.sampleRate;
+    const len = rate * duration;
+    const buf = this.ctx.createBuffer(2, len, rate);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < len; i++) {
+        d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, decay);
+      }
+    }
+    return buf;
+  }
+  // Pluck a note at audioCtx time `when`, MIDI note number, velocity 0..1, duration seconds
+  pluck(when, midiNote, vel, dur) {
+    const ctx = this.ctx;
+    const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+    const bufferSize = Math.round(ctx.sampleRate / freq);
+    const buffer = ctx.createBuffer(1, bufferSize, 1);
+    const data = buffer.getChannelData(0);
+    // Initial excitation: filtered noise (warmer than pure noise)
+    let prev = 0;
+    for (let i = 0; i < bufferSize; i++) {
+      const n = Math.random()*2-1;
+      data[i] = (prev + n) * 0.5;
+      prev = data[i];
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.loop = true;
+
+    // Karplus-Strong via feedback delay + lowpass (averaging)
+    // We approximate with a DelayNode + BiquadFilter in feedback loop.
+    const delay = ctx.createDelay(1.0);
+    delay.delayTime.value = 1 / freq;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    // Slight pitch-dependent damping; higher notes decay a touch faster
+    lp.frequency.value = 2200 + freq * 0.5;
+    lp.Q.value = 0.2;
+
+    const feedback = ctx.createGain();
+    feedback.gain.value = 0.996; // decay factor
+
+    // Body resonance: a gentle peak around 200Hz
+    const body = ctx.createBiquadFilter();
+    body.type = 'peaking';
+    body.frequency.value = 220;
+    body.Q.value = 1.2;
+    body.gain.value = 3;
+
+    const amp = ctx.createGain();
+    // Velocity curve + envelope
+    const v = Math.min(1, vel);
+    amp.gain.setValueAtTime(0, when);
+    amp.gain.linearRampToValueAtTime(0.35 * v, when + 0.004);
+    amp.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+
+    // Routing: src -> delay -> lp -> feedback -> delay (loop)
+    //                       \-> body -> amp -> master
+    src.connect(delay);
+    delay.connect(lp);
+    lp.connect(feedback);
+    feedback.connect(delay);
+    delay.connect(body);
+    body.connect(amp);
+    amp.connect(this.master);
+
+    src.start(when);
+    src.stop(when + dur + 0.05);
+  }
+}
+
+/* ---------- Scheduler: convert MIDI events to audio time ---------- */
+function buildSchedule(parsed, octaveShift) {
+  // Merge tempo changes across all tracks, compute tick->seconds map
+  const tempos = []; // {tick, usPerQ}
+  for (const tr of parsed.tracks) {
+    for (const e of tr) if (e.type === 'tempo') tempos.push(e);
+  }
+  tempos.sort((a,b) => a.tick - b.tick);
+  if (tempos.length === 0 || tempos[0].tick !== 0) {
+    tempos.unshift({ tick: 0, usPerQ: 500000 }); // default 120 bpm
+  }
+
+  function tickToSec(tick) {
+    let sec = 0, lastTick = 0, usPerQ = tempos[0].usPerQ;
+    for (let i = 0; i < tempos.length; i++) {
+      const t = tempos[i].tick;
+      if (t > tick) break;
+      sec += ((t - lastTick) / parsed.ppq) * (usPerQ / 1e6);
+      lastTick = t;
+      usPerQ = tempos[i].usPerQ;
+    }
+    sec += ((tick - lastTick) / parsed.ppq) * (usPerQ / 1e6);
+    return sec;
+  }
+
+  const schedule = []; // {timeSec, note, vel, dur}
+  const openNotes = new Map(); // key "ch-note" -> {time, vel}
+
+  for (const tr of parsed.tracks) {
+    openNotes.clear();
+    for (const e of tr) {
+      if (e.type === 'on') {
+        const key = e.ch + '-' + e.note;
+        openNotes.set(key, { time: tickToSec(e.tick), vel: e.vel / 127 });
+      } else if (e.type === 'off') {
+        const key = e.ch + '-' + e.note;
+        const on = openNotes.get(key);
+        if (on) {
+          const start = on.time;
+          const end = tickToSec(e.tick);
+          const dur = Math.max(0.1, end - start);
+          schedule.push({
+            time: start,
+            note: e.note + octaveShift * 12,
+            vel: on.vel,
+            dur: dur
+          });
+          openNotes.delete(key);
+        }
+      }
+    }
+    // Close any notes still open at end of track
+    for (const [key, on] of openNotes) {
+      schedule.push({
+        time: on.time,
+        note: parseInt(key.split('-')[1]) + octaveShift * 12,
+        vel: on.vel,
+        dur: 1.5
+      });
+    }
+  }
+  schedule.sort((a,b) => a.time - b.time);
+  return schedule;
+}
+
+/* ---------- App state & UI ---------- */
+let tracks = []; // {id, name, data (ArrayBuffer), enabled, volume}
+let synth = null;
+let playing = false;
+let playTimeouts = [];
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('fileInput');
+const trackList = document.getElementById('trackList');
+const emptyMsg = document.getElementById('emptyMsg');
+const playBtn = document.getElementById('playBtn');
+const stopBtn = document.getElementById('stopBtn');
+const masterVol = document.getElementById('masterVol');
+const statusEl = document.getElementById('status');
+const octaveShift = document.getElementById('octaveShift');
+
+drop.addEventListener('click', () => fileInput.click());
+drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+drop.addEventListener('drop', e => {
+  e.preventDefault();
+  drop.classList.remove('drag');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+async function handleFiles(files) {
+  for (const f of files) {
+    if (!/\.midi?$/i.test(f.name)) continue;
+    const buf = await f.arrayBuffer();
+    try {
+      parseMidi(buf); // validate
+    } catch (err) {
+      alert('Could not parse ' + f.name + ': ' + err.message);
+      continue;
+    }
+    const id = await dbAdd({
+      name: f.name,
+      data: buf,
+      enabled: true,
+      volume: 0.8
+    });
+    tracks.push({ id, name: f.name, data: buf, enabled: true, volume: 0.8 });
+  }
+  render();
+}
+
+function render() {
+  trackList.innerHTML = '';
+  emptyMsg.style.display = tracks.length ? 'none' : 'block';
+  playBtn.disabled = tracks.length === 0;
+
+  for (const t of tracks) {
+    const row = document.createElement('div');
+    row.className = 'track';
+    row.innerHTML = `
+      <input type="checkbox" ${t.enabled?'checked':''} title="Enable" />
+      <span class="name" title="${t.name}">${t.name}</span>
+      <label>Vol</label>
+      <input type="range" min="0" max="1" step="0.01" value="${t.volume}" />
+      <button class="danger">✕</button>
+    `;
+    const [chk, , , vol, del] = row.children;
+    chk.addEventListener('change', async () => {
+      t.enabled = chk.checked; await dbPut(t);
+    });
+    vol.addEventListener('input', async () => {
+      t.volume = parseFloat(vol.value); await dbPut(t);
+    });
+    del.addEventListener('click', async () => {
+      await dbDel(t.id);
+      tracks = tracks.filter(x => x.id !== t.id);
+      render();
+    });
+    trackList.appendChild(row);
+  }
+}
+
+async function loadTracks() {
+  const rows = await dbAll();
+  tracks = rows.map(r => ({
+    id: r.id, name: r.name, data: r.data,
+    enabled: r.enabled !== false,
+    volume: typeof r.volume === 'number' ? r.volume : 0.8
+  }));
+  render();
+}
+
+function setStatus(msg, playingNow=false) {
+  statusEl.innerHTML = playingNow
+    ? `<span class="playing-indicator"></span>${msg}`
+    : msg;
+}
+
+playBtn.addEventListener('click', () => {
+  if (playing) return;
+  startPlayback();
+});
+stopBtn.addEventListener('click', stopPlayback);
+masterVol.addEventListener('input', () => {
+  if (synth) synth.setVolume(parseFloat(masterVol.value));
+});
+
+function ensureSynth() {
+  if (!synth) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AC();
+    synth = new GuitarSynth(ctx);
+    synth.setVolume(parseFloat(masterVol.value));
+  }
+  if (synth.ctx.state === 'suspended') synth.ctx.resume();
+}
+
+function startPlayback() {
+  const enabled = tracks.filter(t => t.enabled);
+  if (enabled.length === 0) { setStatus('No tracks enabled.'); return; }
+  ensureSynth();
+
+  const shift = parseInt(octaveShift.value);
+  // Build a combined schedule respecting per-track volume
+  const allEvents = [];
+  for (const t of enabled) {
+    let parsed;
+    try { parsed = parseMidi(t.data); } catch(e) { continue; }
+    const sched = buildSchedule(parsed, shift);
+    for (const ev of sched) {
+      allEvents.push({ time: ev.time, note: ev.note, vel: ev.vel * t.volume, dur: ev.dur });
+    }
+  }
+  allEvents.sort((a,b) => a.time - b.time);
+  if (allEvents.length === 0) { setStatus('Nothing to play.'); return; }
+
+  const startAt = synth.ctx.currentTime + 0.15;
+  const LOOKAHEAD = 0.1; // seconds
+  let i = 0;
+  playing = true;
+  stopBtn.disabled = false;
+  playBtn.disabled = true;
+  setStatus('Playing ' + enabled.length + ' track' + (enabled.length>1?'s':'') + '…', true);
+
+  const tick = () => {
+    if (!playing) return;
+    const now = synth.ctx.currentTime - startAt;
+    while (i < allEvents.length && allEvents[i].time < now + LOOKAHEAD) {
+      const ev = allEvents[i];
+      if (ev.note >= 20 && ev.note <= 108) {
+        synth.pluck(startAt + ev.time, ev.note, ev.vel, ev.dur);
+      }
+      i++;
+    }
+    if (i >= allEvents.length) {
+      // Wait for last note to finish
+      const lastEnd = allEvents[allEvents.length-1].time + allEvents[allEvents.length-1].dur;
+      const wait = Math.max(0, (lastEnd - now) * 1000 + 200);
+      const t = setTimeout(() => {
+        playing = false;
+        stopBtn.disabled = true;
+        playBtn.disabled = false;
+        setStatus('Finished. 🌙');
+      }, wait);
+      playTimeouts.push(t);
+      return;
+    }
+    const t = setTimeout(tick, 25);
+    playTimeouts.push(t);
+  };
+  tick();
+}
+
+function stopPlayback() {
+  playing = false;
+  for (const t of playTimeouts) clearTimeout(t);
+  playTimeouts = [];
+  if (synth) {
+    // Quick fade to avoid clicks
+    synth.master.gain.setTargetAtTime(0, synth.ctx.currentTime, 0.05);
+    setTimeout(() => {
+      synth.master.gain.setTargetAtTime(parseFloat(masterVol.value), synth.ctx.currentTime + 0.06, 0.05);
+    }, 120);
+  }
+  stopBtn.disabled = true;
+  playBtn.disabled = tracks.length === 0;
+  setStatus('Stopped.');
+}
+
+/* ---------- Boot ---------- */
+(async () => {
+  await openDB();
+  await loadTracks();
+  setStatus(tracks.length
+    ? `${tracks.length} track${tracks.length>1?'s':''} loaded. Press Play.`
+    : 'Drop some MIDI files to begin.');
+})();
+</script>
+</body>
+</html>

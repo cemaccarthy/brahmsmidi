@@ -1,0 +1,8 @@
+{
+  "name": "Brahms MIDI",
+  "short_name": "Brahms MIDI",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#05050c",
+  "theme_color": "#05050c"
+}
